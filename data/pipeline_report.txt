@@ -1,0 +1,41 @@
+CHW Stunting Prediction - Pipeline Report v2
+=======================================================
+
+Total rows    : 75,593
+Total features: 20
+
+Columns:
+  child_age_months
+  child_sex
+  birth_weight_grams
+  mother_age
+  mother_education
+  mother_bmi
+  wealth_index
+  water_source
+  sanitation_type
+  household_size
+  urban_rural
+  region
+  mother_height_cm
+  birth_interval_months
+  delivery_place
+  birth_size_perceived
+  birth_order
+  antenatal_visits
+  stunted
+  country
+  country_name
+  first_born
+
+By country:
+  Nigeria: 11,364 rows | 4,109 stunted (36.2%)
+  Rwanda: 3,809 rows | 1,272 stunted (33.4%)
+  Ethiopia: 8,855 rows | 3,223 stunted (36.4%)
+  Kenya: 17,327 rows | 3,122 stunted (18.0%)
+  Tanzania: 4,807 rows | 1,391 stunted (28.9%)
+  Uganda: 4,423 rows | 1,257 stunted (28.4%)
+  Ghana: 4,405 rows | 802 stunted (18.2%)
+  Zambia: 3,810 rows | 1,252 stunted (32.9%)
+  Burundi: 6,048 rows | 3,300 stunted (54.6%)
+  DRC: 10,745 rows | 5,006 stunted (46.6%)

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Child Stunting Risk Assessment</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: #1a5276;
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    header .logo {
+      width: 40px; height: 40px;
+      background: #27ae60;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: bold; color: white;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 18px; font-weight: 600; }
+    header p  { font-size: 13px; opacity: 0.8; margin-top: 2px; }
+
+    /* ── LAYOUT ── */
+    .container {
+      max-width: 800px;
+      margin: 24px auto;
+      padding: 0 16px 40px;
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a5276;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #ebf5fb;
+    }
+
+    /* ── FORM GRID ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 520px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: 1 / -1; }
+
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #4a5568;
+    }
+    label .required { color: #e53e3e; }
+
+    input, select {
+      border: 1.5px solid #cbd5e0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 15px;
+      color: #1a202c;
+      transition: border-color 0.15s;
+      background: white;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #1a5276;
+      box-shadow: 0 0 0 3px rgba(26,82,118,0.1);
+    }
+    input.error, select.error { border-color: #e53e3e; }
+
+    .hint {
+      font-size: 11px;
+      color: #718096;
+    }
+
+    /* ── SUBMIT BUTTON ── */
+    .btn-predict {
+      width: 100%;
+      padding: 14px;
+      background: #1a5276;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      margin-top: 8px;
+    }
+    .btn-predict:hover   { background: #154360; }
+    .btn-predict:active  { transform: scale(0.98); }
+    .btn-predict:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    /* ── LOADING ── */
+    #loading {
+      display: none;
+      text-align: center;
+      padding: 32px;
+      color: #718096;
+      font-size: 15px;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #1a5276;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── RESULT CARD ── */
+    #result { display: none; }
+
+    .risk-banner {
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .risk-banner.red    { background: #fff5f5; border: 2px solid #fc8181; }
+    .risk-banner.orange { background: #fffaf0; border: 2px solid #f6ad55; }
+    .risk-banner.green  { background: #f0fff4; border: 2px solid #68d391; }
+
+    .risk-icon {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      flex-shrink: 0;
+    }
+    .red    .risk-icon { background: #fed7d7; }
+    .orange .risk-icon { background: #feebc8; }
+    .green  .risk-icon { background: #c6f6d5; }
+
+    .risk-info h2 {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .red    .risk-info h2 { color: #c53030; }
+    .orange .risk-info h2 { color: #c05621; }
+    .green  .risk-info h2 { color: #276749; }
+
+    .risk-info .probability {
+      font-size: 15px;
+      color: #4a5568;
+      margin-top: 4px;
+    }
+
+    /* ── FACTORS ── */
+    .factor-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f7fafc;
+    }
+    .factor-item:last-child { border-bottom: none; }
+    .factor-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #e53e3e;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+    .factor-text { font-size: 14px; color: #2d3748; line-height: 1.5; }
+
+    /* ── RECOMMENDATION ── */
+    .rec-box {
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .rec-box.red    { background: #fff5f5; border-left: 4px solid #fc8181; }
+    .rec-box.orange { background: #fffaf0; border-left: 4px solid #f6ad55; }
+    .rec-box.green  { background: #f0fff4; border-left: 4px solid #68d391; }
+
+    .rec-action {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .red    .rec-action { color: #c53030; }
+    .orange .rec-action { color: #c05621; }
+    .green  .rec-action { color: #276749; }
+
+    .rec-detail  { font-size: 14px; color: #4a5568; line-height: 1.6; }
+    .rec-followup {
+      font-size: 13px;
+      color: #718096;
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    /* ── RESET BUTTON ── */
+    .btn-reset {
+      width: 100%;
+      padding: 12px;
+      background: transparent;
+      color: #1a5276;
+      border: 2px solid #1a5276;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.15s;
+    }
+    .btn-reset:hover { background: #ebf5fb; }
+
+    /* ── ERROR ── */
+    #error-msg {
+      display: none;
+      background: #fff5f5;
+      border: 1px solid #fc8181;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #c53030;
+      font-size: 14px;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">+</div>
+  <div>
+    <h1>Child Stunting Risk Assessment</h1>
+    <p>Community Health Worker Tool — Sub-Saharan Africa</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ── FORM ── -->
+  <div id="form-section">
+
+    <!-- Country -->
+    <div class="card">
+      <div class="card-title">Country</div>
+      <div class="form-group">
+        <label for="country">Select Country <span class="required">*</span></label>
+        <select id="country">
+          <option value="">— select country —</option>
+          <option value="1">Nigeria</option>
+          <option value="2">Rwanda</option>
+          <option value="3">Ethiopia</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Child Information -->
+    <div class="card">
+      <div class="card-title">Child Information</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="child_age">Age <span class="required">*</span></label>
+          <input type="number" id="child_age" placeholder="e.g. 18" min="0" max="59"/>
+          <span class="hint">Months (0 – 59)</span>
+        </div>
+        <div class="form-group">
+          <label for="child_sex">Sex <span class="required">*</span></label>
+          <select id="child_sex">
+            <option value="">— select —</option>
+            <option value="1">Male</option>
+            <option value="2">Female</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="birth_weight">Birth Weight <span class="required">*</span></label>
+          <input type="number" id="birth_weight" placeholder="e.g. 3200" min="500" max="6000"/>
+          <span class="hint">Grams (500 – 6000). Use 2500 if unknown.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mother Information -->
+    <div class="card">
+      <div class="card-title">Mother Information</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="mother_age">Mother's Age <span class="required">*</span></label>
+          <input type="number" id="mother_age" placeholder="e.g. 28" min="15" max="49"/>
+          <span class="hint">Years (15 – 49)</span>
+        </div>
+        <div class="form-group">
+          <label for="mother_education">Education Level <span class="required">*</span></label>
+          <select id="mother_education">
+            <option value="">— select —</option>
+            <option value="0">No education</option>
+            <option value="1">Primary</option>
+            <option value="2">Secondary</option>
+            <option value="3">Higher</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="mother_bmi">Mother's BMI <span class="required">*</span></label>
+          <input type="number" id="mother_bmi" placeholder="e.g. 22.5" min="10" max="60" step="0.1"/>
+          <span class="hint">Use 22 if BMI is unknown</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Household Information -->
+    <div class="card">
+      <div class="card-title">Household Information</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="wealth_index">Wealth Level <span class="required">*</span></label>
+          <select id="wealth_index">
+            <option value="">— select —</option>
+            <option value="1">Poorest</option>
+            <option value="2">Poor</option>
+            <option value="3">Middle</option>
+            <option value="4">Rich</option>
+            <option value="5">Richest</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="household_size">Household Size <span class="required">*</span></label>
+          <input type="number" id="household_size" placeholder="e.g. 5" min="1" max="30"/>
+          <span class="hint">Total number of people</span>
+        </div>
+        <div class="form-group">
+          <label for="water_source">Drinking Water Source <span class="required">*</span></label>
+          <select id="water_source">
+            <option value="">— select —</option>
+            <option value="0">Piped / Protected</option>
+            <option value="1">Well / Borehole</option>
+            <option value="2">River / Pond / Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="sanitation_type">Toilet Facility <span class="required">*</span></label>
+          <select id="sanitation_type">
+            <option value="">— select —</option>
+            <option value="0">Flush toilet</option>
+            <option value="1">Pit latrine</option>
+            <option value="2">No facility / Open</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Location -->
+    <div class="card">
+      <div class="card-title">Location</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="urban_rural">Area Type <span class="required">*</span></label>
+          <select id="urban_rural">
+            <option value="">— select —</option>
+            <option value="1">Urban</option>
+            <option value="2">Rural</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="region">Region Code <span class="required">*</span></label>
+          <input type="number" id="region" placeholder="e.g. 1" min="1" max="20"/>
+          <span class="hint">Administrative region number</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-predict" onclick="submitPrediction()">
+      Assess Stunting Risk
+    </button>
+    <div id="error-msg"></div>
+
+  </div><!-- end form-section -->
+
+  <!-- ── LOADING ── -->
+  <div id="loading">
+    <div class="spinner"></div>
+    Analysing child profile...
+  </div>
+
+  <!-- ── RESULT ── -->
+  <div id="result">
+
+    <div class="card">
+      <div class="card-title">Assessment Result</div>
+      <div id="risk-banner" class="risk-banner">
+        <div class="risk-icon" id="risk-icon"></div>
+        <div class="risk-info">
+          <h2 id="risk-level-text"></h2>
+          <div class="probability" id="probability-text"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Key Risk Factors</div>
+      <div id="factors-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Recommended Action</div>
+      <div id="rec-box" class="rec-box">
+        <div class="rec-action" id="rec-action"></div>
+        <div class="rec-detail"  id="rec-detail"></div>
+        <div class="rec-followup" id="rec-followup"></div>
+      </div>
+    </div>
+
+    <button class="btn-reset" onclick="resetForm()">
+      Assess Another Child
+    </button>
+
+  </div><!-- end result -->
+
+</div><!-- end container -->
+
+<script>
+  const API_URL = '';  // Same origin — FastAPI serves both
+
+  function getVal(id) {
+    return document.getElementById(id).value;
+  }
+
+  function validate() {
+    const fields = [
+      'country','child_age','child_sex','birth_weight',
+      'mother_age','mother_education','mother_bmi',
+      'wealth_index','household_size','water_source',
+      'sanitation_type','urban_rural','region'
+    ];
+    for (const id of fields) {
+      const el = document.getElementById(id);
+      if (!el.value || el.value === '') {
+        el.classList.add('error');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return false;
+      }
+      el.classList.remove('error');
+    }
+    return true;
+  }
+
+  async function submitPrediction() {
+    document.getElementById('error-msg').style.display = 'none';
+
+    if (!validate()) {
+      const err = document.getElementById('error-msg');
+      err.textContent = 'Please fill in all required fields.';
+      err.style.display = 'block';
+      return;
+    }
+
+    // Show loading
+    document.getElementById('form-section').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('result').style.display = 'none';
+
+    const payload = {
+      country:            parseInt(getVal('country')),
+      child_age_months:   parseFloat(getVal('child_age')),
+      child_sex:          parseInt(getVal('child_sex')),
+      birth_weight_grams: parseFloat(getVal('birth_weight')),
+      mother_age:         parseFloat(getVal('mother_age')),
+      mother_education:   parseInt(getVal('mother_education')),
+      mother_bmi:         parseFloat(getVal('mother_bmi')),
+      wealth_index:       parseInt(getVal('wealth_index')),
+      water_source:       parseInt(getVal('water_source')),
+      sanitation_type:    parseInt(getVal('sanitation_type')),
+      household_size:     parseFloat(getVal('household_size')),
+      urban_rural:        parseInt(getVal('urban_rural')),
+      region:             parseInt(getVal('region')),
+    };
+
+    try {
+      const res  = await fetch(`${API_URL}/predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Prediction failed');
+      }
+
+      const data = await res.json();
+      renderResult(data);
+
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('form-section').style.display = 'block';
+      const errEl = document.getElementById('error-msg');
+      errEl.textContent = `Error: ${err.message}`;
+      errEl.style.display = 'block';
+    }
+  }
+
+  function renderResult(data) {
+    document.getElementById('loading').style.display = 'none';
+
+    const { prediction, recommendation, risk_factors } = data;
+    const color = prediction.risk_color;
+
+    // Risk banner
+    const banner = document.getElementById('risk-banner');
+    banner.className = `risk-banner ${color}`;
+
+    const icons = { red: '⚠️', orange: '⚡', green: '✓' };
+    document.getElementById('risk-icon').textContent = icons[color] || '?';
+
+    const labels = { HIGH: 'HIGH RISK', MODERATE: 'MODERATE RISK', LOW: 'LOW RISK' };
+    document.getElementById('risk-level-text').textContent = labels[prediction.risk_level];
+    document.getElementById('probability-text').textContent =
+      `${prediction.probability}% probability of stunting`;
+
+    // Risk factors
+    const factorsList = document.getElementById('factors-list');
+    if (risk_factors && risk_factors.length > 0) {
+      factorsList.innerHTML = risk_factors.map(f => `
+        <div class="factor-item">
+          <div class="factor-dot"></div>
+          <div class="factor-text">${f.message}</div>
+        </div>
+      `).join('');
+    } else {
+      factorsList.innerHTML = '<div class="factor-text" style="color:#718096;">No significant risk factors identified.</div>';
+    }
+
+    // Recommendation
+    const recBox = document.getElementById('rec-box');
+    recBox.className = `rec-box ${color}`;
+    document.getElementById('rec-action').textContent   = recommendation.action;
+    document.getElementById('rec-detail').textContent   = recommendation.detail;
+    document.getElementById('rec-followup').textContent = recommendation.followup;
+
+    // Show result
+    document.getElementById('result').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetForm() {
+    document.getElementById('result').style.display = 'none';
+    document.getElementById('form-section').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+
+</body>
+</html>

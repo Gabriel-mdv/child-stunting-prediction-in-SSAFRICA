@@ -1,0 +1,40 @@
+CHW Stunting Prediction — Model Report v2
+=======================================================
+
+Model: XGBoost (tuned + threshold optimised)
+
+Decision threshold: 0.469  (recall target >= 0.75)
+
+Performance:
+  Recall:    0.757
+  Precision: 0.523
+  F1 Score:  0.618
+  ROC-AUC:   0.778
+
+Best XGBoost params:
+  colsample_bytree: 0.710653012024796
+  gamma: 0.046931112801325815
+  learning_rate: 0.04503400574304335
+  max_depth: 4
+  min_child_weight: 10
+  n_estimators: 436
+  reg_alpha: 0.13996694847297142
+  reg_lambda: 1.9322979209947913
+  subsample: 0.908263920843519
+
+Top Features (SHAP):
+  mother_height_cm: 0.3880
+  age_x_poverty: 0.2040
+  age_x_low_edu: 0.1877
+  child_age_months: 0.1673
+  child_sex: 0.1509
+  mother_bmi: 0.1356
+  country_4: 0.1187
+  wealth_index: 0.1111
+  country_10: 0.1001
+  country_9: 0.0930
+  birth_interval_months: 0.0928
+  antenatal_visits: 0.0908
+  birth_weight_grams: 0.0862
+  region_3.0: 0.0652
+  age_sq: 0.0580

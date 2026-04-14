@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/pip install:*)",
+      "Bash(.venv/Scripts/python 3_api.py)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(PYTHONUTF8=1 .venv/Scripts/python 3_api.py)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{content_type}\" http://localhost:8000/)",
+      "Bash(curl -s -X POST http://localhost:8000/predict -H 'Content-Type: application/json' -d '{:*)",
+      "Bash(python -m json.tool)"
+    ]
+  }
+}
