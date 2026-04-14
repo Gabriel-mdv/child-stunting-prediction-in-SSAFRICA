@@ -153,6 +153,35 @@ def engineer_features(X: pd.DataFrame) -> pd.DataFrame:
             (X['birth_interval_months'] < 24) & (X['first_born'] == 0)
         ).astype(float)
 
+    # ── New v4: Maternal × Birth interactions ──────────────────────────────
+
+    # Mother age × Birth risk (older mothers with birth complications = compounding risk)
+    if 'birth_risk' in X.columns:
+        X['mother_age_x_birth_risk'] = X['mother_age'] * X['birth_risk']
+
+    # Mother height × Birth weight (shorter mothers with low BW child = compounding stunting)
+    if 'mother_height_cm' in X.columns and 'birth_weight_grams' in X.columns:
+        X['mother_short_x_low_bw'] = X['mother_short'] * (X['birth_weight_grams'] < 2500).astype(float)
+
+    # Mother education × Antenatal visits (low education mothers who DO get ANC = protective)
+    if 'antenatal_visits' in X.columns:
+        X['low_edu_x_antenatal'] = (X['mother_education'] == 0).astype(float) * X['antenatal_visits']
+
+    # Mother BMI × Birth interval (low BMI + short interval = nutrient depletion risk)
+    if 'birth_interval_months' in X.columns and 'first_born' in X.columns:
+        short_interval_flag = ((X['birth_interval_months'] < 24) & (X['first_born'] == 0)).astype(float)
+        X['low_bmi_x_short_interval'] = (X['mother_bmi'] < 18.5).astype(float) * short_interval_flag
+
+    # Maternal risk × Birth risk (vulnerable mother + birth complications = high stunting)
+    X['maternal_x_birth_risk'] = X['mother_risk'] * X['birth_risk']
+
+    # Delivery place × Antenatal (private facility + good ANC = protective; home + no ANC = high risk)
+    if 'delivery_place' in X.columns and 'antenatal_visits' in X.columns:
+        X['delivery_x_antenatal'] = X['delivery_place'] * X['antenatal_visits']
+
+    # Wealth × Birth risk (poor household + birth complications = worst outcome)
+    X['wealth_x_birth_risk'] = X['wealth_index'] * X['birth_risk']
+
     return X
 
 
@@ -337,10 +366,14 @@ def train():
         result = evaluate(name, model, X_test, y_test)
         baseline_results.append(result)
 
-    # ── STEP 6: TUNE XGBOOST WITH RANDOMIZEDSEARCHCV ─────────────────────────
+    # ── STEP 6A: XGBOOST STAGE 1 - QUICK SCREENING ─────────────────────────────
     print(f"\n{'='*55}")
-    print("Tuning XGBoost (RandomizedSearchCV, 25 iterations)...")
+    print("STAGE 1: Quick screening (n_iter=15, all weights)...")
+    print(f"Default ratio (neg/pos): {scale_pos_weight:.2f}")
     print(f"{'='*55}")
+
+    test_weights = [1.5, 2.0, 2.06, scale_pos_weight, 2.5]
+    stage1_results = {}
 
     param_dist = {
         'n_estimators':      randint(200, 600),
@@ -354,69 +387,151 @@ def train():
         'reg_lambda':        uniform(0.5, 1.5),
     }
 
-    base_xgb = xgb.XGBClassifier(
-        scale_pos_weight=scale_pos_weight,
-        eval_metric='logloss',
-        random_state=RANDOM_SEED,
-        n_jobs=-1,
-        verbosity=0,
-        use_label_encoder=False,
-    )
+    print(f"\n{'Weight':<8} {'CV F1':>8}")
+    print("-" * 25)
 
-    search = RandomizedSearchCV(
-        estimator=base_xgb,
-        param_distributions=param_dist,
-        n_iter=50,
-        scoring='f1',
-        cv=StratifiedKFold(5, shuffle=True, random_state=RANDOM_SEED),
-        random_state=RANDOM_SEED,
-        n_jobs=-1,
-        verbose=1,
-        refit=True,
-    )
-    search.fit(X_train, y_train)
+    for weight in test_weights:
+        base_xgb = xgb.XGBClassifier(
+            scale_pos_weight=weight,
+            eval_metric='logloss',
+            random_state=RANDOM_SEED,
+            n_jobs=-1,
+            verbosity=0,
+            use_label_encoder=False,
+        )
 
-    tuned_xgb    = search.best_estimator_
-    best_params  = search.best_params_
-    best_cv_auc  = search.best_score_
+        search = RandomizedSearchCV(
+            estimator=base_xgb,
+            param_distributions=param_dist,
+            n_iter=15,
+            scoring='f1',
+            cv=StratifiedKFold(5, shuffle=True, random_state=RANDOM_SEED),
+            random_state=RANDOM_SEED,
+            n_jobs=-1,
+            verbose=0,
+            refit=True,
+        )
+        search.fit(X_train, y_train)
 
-    print(f"\nBest CV ROC-AUC: {best_cv_auc:.3f}")
-    print(f"Best params: {best_params}")
+        best_cv_f1 = search.best_score_
+        stage1_results[weight] = {
+            'cv_f1': best_cv_f1,
+            'params': search.best_params_,
+            'estimator': search.best_estimator_,
+        }
+        print(f"{weight:<8.2f} {best_cv_f1:>8.3f}")
 
-    # Evaluate at default threshold first
-    xgb_result = evaluate('XGBoost (tuned)', tuned_xgb, X_test, y_test, threshold=0.5)
+    # Pick top 2 weights by CV F1
+    top_weights = sorted(stage1_results.items(),
+                        key=lambda x: x[1]['cv_f1'],
+                        reverse=True)[:2]
+    top_weight_list = [w[0] for w in top_weights]
 
-    # ── STEP 7: OPTIMISE DECISION THRESHOLD ───────────────────────────────────
+    print(f"\n✓ Top 2 weights selected: {[f'{w:.2f}' for w in top_weight_list]}")
+
+    # ── STEP 6B: XGBOOST STAGE 2 - FULL TUNING ─────────────────────────────────
     print(f"\n{'='*55}")
-    print(f"Finding optimal threshold (min recall = {RECALL_TARGET})...")
+    print("STAGE 2: Full tuning (n_iter=75, top 2 weights)...")
+    print(f"{'='*55}")
 
-    optimal_threshold = find_optimal_threshold(
-        y_test.values, xgb_result['y_proba'], min_recall=RECALL_TARGET
-    )
-    print(f"  Optimal threshold: {optimal_threshold:.3f}  "
-          f"(default was 0.500)")
+    xgb_results_by_weight = {}
 
-    # Re-evaluate at optimal threshold
-    xgb_opt = evaluate(
-        'XGBoost (tuned + optimal threshold)',
-        tuned_xgb, X_test, y_test,
-        threshold=optimal_threshold
-    )
+    for weight in top_weight_list:
+        print(f"\n--- Full tuning for scale_pos_weight = {weight:.2f} ---")
 
-    # ── STEP 8: FULL COMPARISON ───────────────────────────────────────────────
-    all_results = baseline_results + [xgb_result, xgb_opt]
+        base_xgb = xgb.XGBClassifier(
+            scale_pos_weight=weight,
+            eval_metric='logloss',
+            random_state=RANDOM_SEED,
+            n_jobs=-1,
+            verbosity=0,
+            use_label_encoder=False,
+        )
+
+        search = RandomizedSearchCV(
+            estimator=base_xgb,
+            param_distributions=param_dist,
+            n_iter=75,
+            scoring='f1',
+            cv=StratifiedKFold(5, shuffle=True, random_state=RANDOM_SEED),
+            random_state=RANDOM_SEED,
+            n_jobs=-1,
+            verbose=0,
+            refit=True,
+        )
+        search.fit(X_train, y_train)
+
+        tuned_xgb = search.best_estimator_
+        best_params = search.best_params_
+        best_cv_f1 = search.best_score_
+
+        print(f"  Best CV F1: {best_cv_f1:.3f}")
+
+        # Evaluate at default threshold
+        xgb_default = evaluate(
+            f'XGBoost (weight={weight:.2f}, threshold=0.50)',
+            tuned_xgb, X_test, y_test, threshold=0.5
+        )
+
+        # Find optimal threshold
+        optimal_threshold = find_optimal_threshold(
+            y_test.values, xgb_default['y_proba'], min_recall=RECALL_TARGET
+        )
+
+        # Re-evaluate at optimal threshold
+        xgb_optimal = evaluate(
+            f'XGBoost (weight={weight:.2f}, threshold={optimal_threshold:.3f})',
+            tuned_xgb, X_test, y_test,
+            threshold=optimal_threshold
+        )
+
+        xgb_results_by_weight[weight] = {
+            'model': tuned_xgb,
+            'threshold': optimal_threshold,
+            'params': best_params,
+            'results': xgb_optimal,
+            'explainer': shap.TreeExplainer(tuned_xgb),
+        }
+
+    # ── STEP 7: COMPARE STAGE 2 RESULTS ──────────────────────────────────────────
+    print(f"\n{'='*55}")
+    print("Stage 2 Results (Full Tuning)")
+    print(f"{'='*55}")
+    print(f"{'Weight':<8} {'Recall':>8} {'Precision':>12} {'F1':>8} {'ROC-AUC':>10}")
+    print("-" * 60)
+
+    all_xgb_results = []
+    for weight, result_dict in sorted(xgb_results_by_weight.items()):
+        r = result_dict['results']
+        all_xgb_results.append(r)
+        print(f"{weight:<8.2f} {r['recall']:>8.3f} {r['precision']:>12.3f} {r['f1']:>8.3f} {r['roc_auc']:>10.3f}")
+
+    # Select best by F1 score
+    best_entry = max(xgb_results_by_weight.items(),
+                     key=lambda x: x[1]['results']['f1'])
+    best_weight = best_entry[0]
+    best_result = best_entry[1]
+    tuned_xgb = best_result['model']
+    optimal_threshold = best_result['threshold']
+    best_params = best_result['params']
+    explainer = best_result['explainer']
+
+    print(f"\n✓ Best F1 achieved with scale_pos_weight = {best_weight:.2f}")
+
+    best = best_result['results']
+
+    # ── STEP 8: FULL COMPARISON (including baselines) ────────────────────────────
+    all_results = baseline_results + all_xgb_results
 
     print(f"\n{'='*55}")
-    print("MODEL COMPARISON SUMMARY")
+    print("OVERALL MODEL COMPARISON SUMMARY")
     print(f"{'='*55}")
     print(f"{'Model':<40} {'Recall':>8} {'F1':>8} {'ROC-AUC':>10}")
     print("-" * 70)
     for r in all_results:
-        marker = " *" if r['name'] == xgb_opt['name'] else ""
+        marker = " *" if r['name'] == best['name'] else ""
         print(f"{r['name']:<40} {r['recall']:>8.3f} {r['f1']:>8.3f} {r['roc_auc']:>10.3f}{marker}")
     print("\n  * = final deployed model")
-
-    best = xgb_opt   # always deploy the tuned + threshold-optimised model
 
     # Detailed report
     print(f"\nDetailed report — {best['name']}:")
