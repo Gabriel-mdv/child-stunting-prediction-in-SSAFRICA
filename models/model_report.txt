@@ -1,62 +1,62 @@
 CHW Stunting Prediction - Model Training Report
 =================================================================
 
-FINAL MODEL: XGBoost (weight=2.00, threshold=0.464)
+FINAL MODEL: XGBoost (weight=2.50, threshold=0.321)
 
 Performance Metrics:
-  Recall:     0.753  (target >= 0.75)
-  Precision:  0.523
-  F1 Score:   0.618
-  ROC-AUC:    0.777
-  Threshold:  0.464  (default: 0.500)
+  Recall:     0.899  (target >= 0.75)
+  Precision:  0.426
+  F1 Score:   0.578
+  ROC-AUC:    0.773
+  Threshold:  0.321  (default: 0.500)
 
 Confusion Matrix:
-  TN (correct not-stunted): 6,778
-  FP (false alarm):          3,394
-  FN (missed stunted):       1,221
-  TP (caught stunted):       3,726
-  Miss rate: 24.7%
+  TN (correct not-stunted): 3,125
+  FP (false alarm):          4,504
+  FN (missed stunted):       374
+  TP (caught stunted):       3,336
+  Miss rate: 10.1%
 
 EXPERIMENT 1 - Model Progression:
-  LR:        Recall=0.725  F1=0.612  AUC=0.769
-  RF:        Recall=0.695  F1=0.601  AUC=0.764
-  XGB(0.50): Recall=0.714  F1=0.616  AUC=0.777
-  XGB(opt):  Recall=0.753  F1=0.618  AUC=0.777
+  LR:        Recall=0.720  F1=0.611  AUC=0.771
+  RF:        Recall=0.698  F1=0.605  AUC=0.766
+  XGB(0.50): Recall=0.760  F1=0.614  AUC=0.773
+  XGB(opt):  Recall=0.899  F1=0.578  AUC=0.773
 
 EXPERIMENT 2 - Threshold Comparison:
-  Default(0.50): Recall=0.714  Prec=0.541  F1=0.616
-  Optimal(0.464): Recall=0.753  Prec=0.523  F1=0.618
-  Delta: Recall +0.039  Prec -0.018  F1 +0.002
+  Default(0.50): Recall=0.760  Prec=0.515  F1=0.614
+  Optimal(0.321): Recall=0.899  Prec=0.426  F1=0.578
+  Delta: Recall +0.139  Prec -0.089  F1 -0.036
 
 EXPERIMENT 3 - Feature Engineering (+15 features):
-  No Engineering: Recall=0.757  F1=0.620  AUC=0.779
-  Engineered:     Recall=0.753  F1=0.618  AUC=0.777
-  Delta: Recall -0.004  F1 -0.002  AUC -0.002
+  No Engineering: Recall=0.758  F1=0.615  AUC=0.775
+  Engineered:     Recall=0.899  F1=0.578  AUC=0.773
+  Delta: Recall +0.141  F1 -0.037  AUC -0.002
 
 Best XGBoost Parameters:
-  colsample_bytree: 0.8464470191493236
-  gamma: 0.2312901539863683
-  learning_rate: 0.0791313834910147
+  colsample_bytree: 0.8951252404904699
+  gamma: 0.25399834267149174
+  learning_rate: 0.12988540086293296
   max_depth: 4
-  min_child_weight: 12
-  n_estimators: 241
-  reg_alpha: 0.21966825093288506
-  reg_lambda: 0.8025788035030943
-  subsample: 0.9635172584857318
+  min_child_weight: 10
+  n_estimators: 315
+  reg_alpha: 0.042069982497524416
+  reg_lambda: 0.7424430711419207
+  subsample: 0.9644939659844778
 
 Top 15 Features (SHAP Importance):
-   1. mother_height_cm              : 0.3897
-   2. age_x_poverty                 : 0.2143
-   3. age_x_low_edu                 : 0.2032
-   4. child_age_months              : 0.1992
-   5. child_sex                     : 0.1505
-   6. mother_bmi                    : 0.1341
-   7. delivery_x_antenatal          : 0.1256
-   8. wealth_index                  : 0.1059
-   9. country_4                     : 0.1040
-  10. country_9                     : 0.0938
-  11. country_10                    : 0.0928
-  12. birth_interval_months         : 0.0923
-  13. birth_weight_grams            : 0.0805
-  14. region_3.0                    : 0.0637
-  15. mother_age                    : 0.0528
+   1. mother_height_cm              : 0.3752
+   2. child_age_months              : 0.2512
+   3. age_x_poverty                 : 0.2439
+   4. age_x_low_edu                 : 0.1905
+   5. child_sex                     : 0.1628
+   6. mother_bmi                    : 0.1274
+   7. country_4                     : 0.1155
+   8. birth_interval_months         : 0.1146
+   9. wealth_index                  : 0.1127
+  10. delivery_x_antenatal          : 0.1069
+  11. country_9                     : 0.0986
+  12. birth_weight_grams            : 0.0979
+  13. country_10                    : 0.0944
+  14. mother_age                    : 0.0783
+  15. birth_order                   : 0.0744
